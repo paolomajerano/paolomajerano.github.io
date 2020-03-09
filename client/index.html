@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box;}
+      body { font: 25px "Comic Sans MS", cursive, sans-serif;}
+      form { background: #000; padding: 3px; position: absolute; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 99%; margin-right: .5%; }
+      #usersOn {position: fixed; right: 0; width: 39%; height: 90%; top: 40px;bottom: 60px; list-style-type: none;  overflow-y: scroll;
+      display:flex; flex-direction: column;}
+      #usersOn li{padding: 5px 10px; word-wrap: break-word; margin-top: auto;}
+      #messages { position: fixed; width: 60%; height: 90%;  top: 40px; bottom: 60px; list-style-type: none;  overflow-y: scroll; 
+      display:flex; flex-direction: column;}
+      #messages li { padding: 5px 10px; word-wrap: break-word; margin-top: auto;}
+      #name {width: 60%; position: fixed; background-color: gray;}
+      #onLabel {width: 39%; right: 0; position: fixed; background-color: gray;}
+    </style>
+  </head>
+  <body>
+    <h4 id = 'name'></h4>
+    <h4 id = 'onLabel'>Users online:</h4>
+    <ul id="messages"></ul>
+    <ul id="usersOn">
+    </ul>
+    <form action="">
+      <input id="m" autocomplete="off" />
+    </form>
+  </body>
+  <script src= "/socket.io/socket.io.js"></script>
+  <script src = "https://code.jquery.com/jquery-1.11.1.js"></script>
+  <script>
+    $(function () {
+        var socket  = io();
+        var user = '';
+        var nickNameReg = /\/nick .*/;
+        var color = 'black';
+        var otherCommand = /\/.*/;
+        var nickColorReg = /\/nickcolor (([a-f0-9]{6})|([a-zA-Z]+))/;
+
+        
+        $('form').submit(function(e){
+            e.preventDefault();
+            var msg = $('#m').val();
+            if (nickNameReg.test(msg)){
+              socket.emit('/namechange', msg.split(' ')[1], user);
+            }
+            else if(nickColorReg.test(msg)){
+              color = msg.split(' ')[1];
+              socket.emit('/colorchange', color, user)
+            }
+            else if(otherCommand.test(msg)){
+              $('#messages').append($('<li>').text(msg+' is not a command').css({
+              "font-style": "Italic", 'font': '10px', 'text-align': 'center', 'color': 'grey'}));
+            }
+            else{
+              socket.emit('/sendmsg', msg, user, color);
+            }
+            $('#m').val('');
+            return false;
+        });
+
+        socket.on('/loadmsgs', function(messages){
+          console.log(messages);
+          while (messages.length !== 0){
+            msg = messages.pop();
+            $('#messages').prepend($('<li>').text(msg.time)
+              .append($(
+                '<span style = "color: ' + msg.color +';">' + msg.name + ': ' +'</span>'))
+                  .append(msg.mess));
+          }
+          $('#messages')[0].scrollTop = $('#messages')[0].scrollHeight;
+        });
+
+        socket.on('/setname', function(userName) {
+          user = userName;
+          $('#name').replaceWith('<h4 id = "name">' + "You are " + user + "</h4>") ;
+        });
+
+        socket.on('/getusers', function(users){
+          var htmlUsers = '<ul id="usersOn">';
+          for (var i = 0; i< users.length; i++){
+            htmlUsers = htmlUsers + '<li style = "color: '+ users[i].color + ';">' + users[i].name + '</li>';
+          };
+          $('#usersOn').replaceWith(htmlUsers + '</ul>');
+        });
+
+        socket.on('/recievemsg', function(msg, inUser, time, color){
+          if(inUser === user){
+            $('#messages').append($('<li>').text(time)
+              .append($(
+                '<span style = "color: ' + color +';">' + inUser + ': ' +'</span>'))
+                  .append(msg).css("font-weight", 'Bold'));
+          }
+
+          else if(inUser === 'Admin'){
+            $('#messages').append($('<li>').text(msg).css({
+              "font-style": "Italic", 'font': '10px', 'text-align': 'center', 'color': 'grey'}));
+          }
+
+          else{
+            $('#messages').append($('<li>').text(time)
+              .append($(
+                '<span style = "color: ' + color +';">' + inUser + ': '+ '</span>'))
+                  .append(msg)); 
+          }
+          
+
+          $('#messages')[0].scrollTop = $('#messages')[0].scrollHeight;
+        });
+    });
+  </script>
+</html>
